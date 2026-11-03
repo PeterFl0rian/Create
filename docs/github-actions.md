@@ -5,7 +5,7 @@ This document describes the GitHub Actions workflows in `.github/workflows/` and
 | Workflow | File | Trigger | Purpose |
 |---|---|---|---|
 | Build | `build.yml` | push, pull request, manual | Builds the mod, runs game tests, publishes releases |
-| Tests | `tests.yml` | push, pull request, manual | Runs unit tests and reports code coverage |
+| Validate | `validate.yml` | push, pull request, manual | Validates the Gradle wrapper and all JSON resources |
 | Label Actions | `label-actions.yml` | issue / PR labeled or unlabeled | Comments on and closes issues and PRs based on labels |
 | Crowdin Action | `localization.yml` | manual | Synchronizes translations with Crowdin |
 
@@ -16,33 +16,34 @@ The main CI workflow. It runs on every push and pull request, and can be started
 Steps:
 1. Checks out the repository and switches to Java 21.
 2. Sets up Gradle with `gradle/actions/setup-gradle`, which caches dependencies between runs.
-3. Builds the mod with `./gradlew build` (compiles the code and runs the `check` tasks).
+3. Builds the mod with `./gradlew build`. This compiles the code and runs the `check` tasks, which include the JUnit unit tests and the JaCoCo coverage report.
 4. Runs the in-game tests with `./gradlew runGameTestServer`. This starts a headless Minecraft server that runs Create's GameTests (`infrastructure/gametest`).
 5. **Release mode only:** when started manually with `is-release: true`, it skips the game tests and runs `./gradlew publishMods`. The `mod-publish-plugin` then uploads the jar to Modrinth, CurseForge and GitHub Releases. It uses the `MODRINTH_TOKEN`, `CURSEFORGE_TOKEN` and `GITHUB_TOKEN` secrets, and the Gradle cache is disabled so the release is built from scratch.
 
-## Tests (`tests.yml`) - new
+## Validate (`validate.yml`) - new
 
-Runs the JUnit unit tests and measures code coverage with JaCoCo. It runs on every push and pull request, and can be started manually.
+Fast checks that do not need to build the mod. It runs on every push and pull request, and can be started manually. It has two independent jobs:
 
-Steps:
-1. Checks out the repository, switches to Java 21 and sets up Gradle (same setup as `build.yml`).
-2. Runs `./gradlew coverage`, which runs the tests (JUnit 5 + Mockito) and generates the JaCoCo report. The workflow fails if any test fails.
-3. Writes the test count and the coverage table into the job summary, so the results are visible on the run page without downloading anything:
-   ```
-   Tests: 36, passed: 36, failed: 0, skipped: 0
-   Code coverage (JaCoCo)
-                              instructions       lines              branches           methods
-   StringHelper                 97.5% (118/121)    95.2%   (20/21)   100.0%   (12/12)    66.7%     (2/3)
-   ...
-   ```
-4. Uploads the HTML test report and the JaCoCo coverage report as the `test-reports` artifact. Steps 3 and 4 also run when the tests fail, so failures can be inspected.
+**Gradle Wrapper:** `gradle/actions/wrapper-validation` checks that `gradle/wrapper/gradle-wrapper.jar` matches the checksum of an official Gradle release. The wrapper jar runs on every developer machine and CI server that builds the project, so a tampered jar in a pull request would be a supply chain attack. This check catches it.
 
-Run the same thing locally with:
-```bash
-./gradlew coverage
+**JSON Resources:** `.github/scripts/validate_json.py` parses every `.json` file in `src/main/resources` and `src/generated/resources` (about 8000 files: translations, recipes, models, blockstates, tags, ...). It reports:
+- invalid JSON (missing comma, trailing comma, unclosed bracket, ...)
+- duplicate keys, e.g. the same translation key twice in a lang file, where one value silently overrides the other
+
+Problems are reported as GitHub annotations, so they appear directly on the affected file in the pull request:
+```
+::error file=src/main/resources/assets/create/lang/de_de.json,line=120,col=5::Invalid JSON: Expecting ',' delimiter
+Checked 8011 JSON files, found 1 problem(s).
 ```
 
-Unlike `build.yml`, this workflow does not start a Minecraft server, so it gives quick feedback on the unit tests alone.
+This matters especially for translations, which arrive automatically from Crowdin (`localization.yml`), and for hand-edited resources. A broken JSON file would otherwise only show up when the game loads it.
+
+Run the JSON check locally with:
+```bash
+python3 .github/scripts/validate_json.py src/main/resources src/generated/resources
+```
+
+Neither job uses Gradle or downloads dependencies, so the workflow finishes in seconds.
 
 ## Label Actions (`label-actions.yml`)
 
@@ -73,8 +74,8 @@ File and language mapping is configured in `crowdin.yml`. Credentials come from 
 | Blossom | `build.gradle` | Injects the mod version and git commit hash into the source code at build time. |
 | Crowdin | `crowdin.yml`, `localization.yml` | Community translation platform. |
 | GitHub issue templates | `.github/ISSUE_TEMPLATE/` | Structured forms for bug and crash reports. |
-| JUnit 5, Mockito, JaCoCo | `build.gradle`, `src/test/` | Unit tests, test doubles and code coverage, used by `tests.yml`. |
+| JUnit 5, Mockito, JaCoCo | `build.gradle`, `src/test/` | Unit tests, test doubles and code coverage. Run as part of `./gradlew build` in `build.yml`, or locally with `./gradlew coverage`. |
 
 ## Known issue
 
-At the time of writing, `maven.createmod.net` serves an expired SSL certificate. Gradle cannot download Create's dependencies from it, so both `build.yml` and `tests.yml` fail during dependency resolution until the certificate is renewed. Locally, `./gradlew coverage --offline` works as long as the dependencies are already in the Gradle cache.
+At the time of writing, `maven.createmod.net` serves an expired SSL certificate. Gradle cannot download Create's dependencies from it, so `build.yml` fails during dependency resolution until the certificate is renewed. Locally, `./gradlew build --offline` works as long as the dependencies are already in the Gradle cache. `validate.yml` is not affected, because it does not use Gradle dependencies.
