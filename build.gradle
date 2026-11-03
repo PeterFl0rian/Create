@@ -205,6 +205,9 @@ dependencies {
 test {
     useJUnitPlatform()
     jvmArgs("-javaagent:${configurations.mockitoAgent.asPath}")
+    // Always run the tests, so the results and coverage are printed every time
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = "full"
@@ -225,6 +228,8 @@ def coverageClasses = ["StringHelper", "TickBasedCache", "ResetableLazy", "Files
 
 jacocoTestReport {
     dependsOn(test)
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
     reports {
         xml.required = true
         html.required = true
@@ -252,6 +257,13 @@ jacocoTestReport {
         row("package foundation/utility", pkg)
         println("HTML report: ${reports.html.outputLocation.get().asFile}/index.html")
     }
+}
+
+// ./gradlew coverage --offline  runs the tests and prints the code coverage
+tasks.register("coverage") {
+    group = "verification"
+    description = "Runs the unit tests and prints the JaCoCo code coverage."
+    dependsOn(jacocoTestReport)
 }
 
 sourceSets.main {
