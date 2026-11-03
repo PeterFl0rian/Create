@@ -1,0 +1,31 @@
+name: Validate
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gradle-wrapper:
+    name: Gradle Wrapper
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Makes sure gradle-wrapper.jar matches an official Gradle release
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+  json:
+    name: JSON Resources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Catches broken translations, recipes, models etc. before they reach the game
+      - name: Validate JSON Files
+        run: python3 .github/scripts/validate_json.py src/main/resources src/generated/resources
