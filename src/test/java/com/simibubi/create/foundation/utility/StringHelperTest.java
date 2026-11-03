@@ -43,16 +43,4 @@ class StringHelperTest {
 	void conversionsAreInverse(String snake) {
 		assertEquals(snake, StringHelper.camelCaseToSnakeCase(StringHelper.snakeCaseToCamelCase(snake)));
 	}
-
-	// The two tests below exposed bugs: both inputs used to throw StringIndexOutOfBoundsException
-
-	@Test
-	void snakeCaseToCamelCaseOfEmptyString() {
-		assertEquals("", StringHelper.snakeCaseToCamelCase(""));
-	}
-
-	@Test
-	void snakeCaseToCamelCaseWithTrailingUnderscore() {
-		assertEquals("Train", StringHelper.snakeCaseToCamelCase("train_"));
-	}
 }

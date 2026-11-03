@@ -5,9 +5,6 @@ import java.util.Locale;
 public class StringHelper {
 
 	public static String snakeCaseToCamelCase(String text) {
-		if (text.isEmpty())
-			return text;
-
 		StringBuilder builder = new StringBuilder();
 		builder.append(text.substring(0, 1).toUpperCase(Locale.ROOT));
 
@@ -20,8 +17,7 @@ public class StringHelper {
 			}
 
 			builder.append(text.substring(i, j).toLowerCase(Locale.ROOT));
-			if (j + 1 < text.length())
-				builder.append(text.substring(j + 1, j + 2).toUpperCase(Locale.ROOT));
+			builder.append(text.substring(j + 1, j + 2).toUpperCase(Locale.ROOT));
 
 			i = j + 1;
 		}

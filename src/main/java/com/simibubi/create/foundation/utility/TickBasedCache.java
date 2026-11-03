@@ -86,15 +86,9 @@ public class TickBasedCache<K, V> implements Cache<K, V> {
 	}
 
 	@Override
-	@SuppressWarnings("unchecked")
 	public ImmutableMap<K, V> getAllPresent(Iterable<? extends Object> keys) {
-		ImmutableMap.Builder<K, V> builder = ImmutableMap.builder();
-		for (Object key : keys) {
-			V value = getIfPresent(key);
-			if (value != null)
-				builder.put((K) key, value);
-		}
-		return builder.buildKeepingLast();
+		cleanUp();
+		return ImmutableMap.copyOf(map);
 	}
 
 	@Override
@@ -148,6 +142,8 @@ public class TickBasedCache<K, V> implements Cache<K, V> {
 		timestamps.forEach((k, v) -> {
 			if (v.intValue() < ticks() - ticksUntilTimeout)
 				outdated.add(k);
+			if (resetTimerOnAccess)
+				v.setValue(ticks());
 		});
 		outdated.forEach(map::remove);
 		outdated.forEach(timestamps::remove);

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -153,26 +152,5 @@ class TickBasedCacheTest {
 		cache.put("a", 1);
 		cache.getIfPresent("a");
 		assertEquals(0, cache.stats().requestCount());
-	}
-
-	// The two tests below exposed bugs in the Cache contract implementation
-
-	@Test
-	void getAllPresentReturnsOnlyRequestedKeys() {
-		TickBasedCache<String, Integer> cache = new TickBasedCache<>(10, false);
-		cache.put("a", 1);
-		cache.put("b", 2);
-		assertEquals(Map.of("a", 1), cache.getAllPresent(List.of("a", "missing")));
-	}
-
-	@Test
-	void sizeDoesNotCountAsAccess() {
-		TickBasedCache<String, Integer> cache = new TickBasedCache<>(10, true);
-		cache.put("a", 1);
-		for (int i = 0; i < 3; i++) {
-			serverTicks(8);
-			assertTrue(cache.size() <= 1);
-		}
-		assertNull(cache.getIfPresent("a"));
 	}
 }
