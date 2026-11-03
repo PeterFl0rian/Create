@@ -1,0 +1,5 @@
+{
+  // lenient parsing allows comments
+  "name": "bridge",
+  "size": 3
+}

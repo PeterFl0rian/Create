@@ -1,5 +1,6 @@
 plugins {
     id("idea")
+    id("jacoco")
     id("eclipse")
     id("maven-publish")
     id("net.kyori.blossom") version "2.2.0" // https://github.com/KyoriPowered/blossom
@@ -177,6 +178,80 @@ dependencies {
 
     compileOnly("xaero.lib:xaerolib-neoforge-1.21:1.0.42")
     compileOnly("curse.maven:xaeros-world-map-317780:7401095")
+
+    // Unit tests and test doubles
+    testImplementation(platform("org.junit:junit-bom:5.11.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.junit.jupiter:junit-jupiter-params")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("org.mockito:mockito-core:5.14.2")
+}
+
+neoForge.addModdingDependenciesTo(sourceSets.test)
+
+configurations {
+    mockitoAgent
+
+    testCompileClasspath.extendsFrom(localImplementation)
+    testRuntimeClasspath.extendsFrom(localImplementation, localRuntimeOnly)
+}
+
+dependencies {
+    mockitoAgent("org.mockito:mockito-core:5.14.2") {
+        transitive = false
+    }
+}
+
+test {
+    useJUnitPlatform()
+    jvmArgs("-javaagent:${configurations.mockitoAgent.asPath}")
+    testLogging {
+        events("passed", "skipped", "failed")
+        exceptionFormat = "full"
+    }
+    afterSuite { desc, result ->
+        if (desc.parent == null)
+            println("\nTests: ${result.testCount}, passed: ${result.successfulTestCount}, failed: ${result.failedTestCount}, skipped: ${result.skippedTestCount}")
+    }
+    finalizedBy(jacocoTestReport)
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+// Classes whose coverage is printed to the console after the tests
+def coverageClasses = ["StringHelper", "TickBasedCache", "ResetableLazy", "FilesHelper"]
+
+jacocoTestReport {
+    dependsOn(test)
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    doLast {
+        def slurper = new groovy.xml.XmlSlurper()
+        slurper.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false)
+        slurper.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+        def report = slurper.parse(reports.xml.outputLocation.get().asFile)
+        def row = { name, node ->
+            def cells = ["INSTRUCTION", "LINE", "BRANCH", "METHOD"].collect { type ->
+                def c = node.counter.find { it.@type == type }
+                int covered = c.size() ? c.@covered.toInteger() : 0
+                int total = c.size() ? covered + c.@missed.toInteger() : 0
+                String.format("%6.1f%% %9s", total ? 100.0 * covered / total : 0.0, "($covered/$total)")
+            }
+            println(String.format("%-26s %s", name, cells.join("  ")))
+        }
+        println("\nCode coverage (JaCoCo)")
+        println(String.format("%-26s %-17s  %-17s  %-17s  %-17s", "", "instructions", "lines", "branches", "methods"))
+        def pkg = report.package.find { it.@name == "com/simibubi/create/foundation/utility" }
+        coverageClasses.each { cls ->
+            row(cls, pkg.class.find { it.@name == "com/simibubi/create/foundation/utility/$cls" })
+        }
+        row("package foundation/utility", pkg)
+        println("HTML report: ${reports.html.outputLocation.get().asFile}/index.html")
+    }
 }
 
 sourceSets.main {
