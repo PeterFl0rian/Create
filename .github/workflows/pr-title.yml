@@ -1,0 +1,25 @@
+name: PR Title
+on:
+  pull_request:
+    # "edited" re-runs the check when the title is changed
+    types: [ opened, edited, synchronize, reopened ]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-title:
+    name: PR Title
+    runs-on: ubuntu-latest
+    steps:
+      # The title must look like "feat: Add GitHub Actions", with the type being feat, refactor or fix
+      - name: Check PR Title Format
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ "$TITLE" =~ ^(feat|refactor|fix):\ [^[:space:]].* ]]; then
+            echo "PR title is valid: $TITLE"
+          else
+            echo "::error::PR title \"$TITLE\" must have the format '<type>: <description>', where <type> is feat, refactor or fix. Example: 'feat: Add GitHub Actions'"
+            exit 1
+          fi
